@@ -50,6 +50,51 @@ def readXLSFile(filename):
     file = filename
     return (pd.read_excel(file))
 
+def clean(data):
+    #drop first, second, and last row
+    data.drop([0,2,len(data)-1], inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    
+    #rename the columns with the first row and drop the row
+    data.columns = data.iloc[0]
+    data.drop([0], inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    
+    #remove the white space from front and end of string
+    #TODO   
+    for i in data.columns:
+        data = data.rename(columns={i:i.lstrip().rstrip()})
+        
+    #remove the rows with nan for lease names
+    data = data[data['Lease Name'].isna()==False]
+    data.reset_index(drop=True, inplace=True)
+        
+    #create another column attribute for the complex name
+    data['complex']=np.nan #initialize column
+    index = 0 #tracks the next iteration or group of complexes
+    for i in data[data.iloc[:,0].values == 'Total'].index:
+        data.loc[index:i,'complex'] = data['Lease Name'][index]
+        data.drop([index], inplace=True)
+        index=i+1
+    data.reset_index(drop=True, inplace=True)
+
+        
+    #remove the row that calculates total
+    data = data[data['Lease Name']!='Total']
+    data.reset_index(drop=True, inplace=True)
+    
+    #create column for lease ID
+    data['Lease ID'] = data['Lease Name']
+    data['Lease ID'] = data['Lease ID'].map(lambda x: 
+                                            x[x.find('(')+1:x.find(')')-1])
+    
+    
+    
+#%%
+    
+    return data
+()
 if __name__ == '__main__':
     
     df_train = readXLSFile(FILETRAIN)
+    df_train = clean(df_train)
