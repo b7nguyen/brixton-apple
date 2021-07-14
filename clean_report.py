@@ -33,8 +33,8 @@ from imblearn.over_sampling import SMOTENC
 import numpy as np
 import math
 
-PATH = "/input/original_reports"
-FILETRAIN = "RetailSales2018-2021.xlsx"
+PATH = "./input/orginial_reports"
+FILETRAIN = "/RetailSales2018-2021.xlsx"
 #FILECUSTOMER = "/customer_info_qb.xlsx"
 
 
@@ -47,7 +47,7 @@ def readCSVFile(filename):
 def readXLSFile(filename):
     
     file = PATH + filename
-    file = filename
+    #file = filename
     return (pd.read_excel(file))
 
 def clean(data):
