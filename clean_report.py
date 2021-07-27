@@ -55,9 +55,33 @@ def readXLSFile(**kwargs):
     if 'sheet' in kwargs:
         xls = pd.ExcelFile(file)
         ret_frame = pd.read_excel(xls, sheet_name=kwargs['sheet'])
-        #ret_frame = df[kwargs['sheets']]
-        
-        #ret_frame = ret_frame[kwargs['sheets']]
+
+    else:
+        ret_frame = pd.read_excel(file)
+    
+    return ret_frame
+
+def readXLSFileSheets(**kwargs):
+    ret_list= []
+    all_sheets = False
+     
+    if 'filename' in kwargs:
+        file = PATH + kwargs['filename']
+    else:
+        print("File name not provided")
+        return False
+    
+    if 'all_sheets' in kwargs:
+        if kwargs['all_sheets'] == True:
+            xls = pd.ExcelFile(file)
+            if len(xls.sheet_names) > 1:
+                for i in xls.sheet_names:
+                    ret_list.append(pd.read_excel(xls,i))
+        return ret_list
+                    
+                    
+        #ret_frame = pd.read_excel(xls, sheet_name=kwargs['sheet'])
+
     else:
         ret_frame = pd.read_excel(file)
     
@@ -96,11 +120,14 @@ def clean_sales_report(data):
     data = data[data['Lease Name']!='Total']
     data.reset_index(drop=True, inplace=True)
     
+    #remove total column
+    data.drop(['Total'], axis=1, inplace=True)
+    
     #create column for lease ID
 #    data['Lease ID'] = data['Lease Name']
 #    data['Lease ID'] = data['Lease ID'].map(lambda x: 
 #                                            x[x.find('(')+1:x.find(')')-1])
-    
+    data.set_index('Lease Name', inplace=True)
   
     return data
 
@@ -129,12 +156,16 @@ def clean_category_report(data):
 #    data['Lease ID'] = data['Lease ID'].map(lambda x: 
 #                                            x[x.find('(')+1:x.find(')')-1])
 
+    data.set_index('Tenant Name', inplace=True)
+    
     return data
 
 
 def joinCol(data1, data2):
-    data1 = data1.set_index('Lease Name')
-    data2 = data2.set_index('Tenant Name')
+    if(data1.empty):
+        print('first dframe returned')
+        return data2
+
     
     data = pd.concat([data1, data2], join='inner', axis=1)
 
@@ -142,10 +173,28 @@ def joinCol(data1, data2):
 
 if __name__ == '__main__':
     
-    df_sales = readXLSFile(filename=FILETRAIN)
+    #Read every tab of from data file
+    df_sales = readXLSFileSheets(filename=FILETRAIN, all_sheets=True)
+    temp_df = pd.DataFrame()
+    
+    #If there is more than one tab, then the file is a list of dframes, else
+    #clean the one tab
+    if type(df_sales) == list:
+        for i in df_sales:
+            if temp_df.empty:
+                temp_df = clean_sales_report(i)
+            else:
+                temp_df = pd.concat([temp_df, clean_sales_report(i)], join='outer', axis=1)
+                
+    #Drop any duplicated comlumns. We may fix this later    
+    temp_df = temp_df.drop(labels=temp_df.columns[temp_df.columns.duplicated()], axis=1)
+    
+                    
     df_cat = readXLSFile(filename=FILE_ANALYSIS, sheet='Sales Category ')
     
-    df_sales = clean_sales_report(df_sales)
+    
+    #df_sales = clean_sales_report(df_sales)
     df_cat = clean_category_report(df_cat)
     
-    #df_sales = joinCol(df_sales, df_cat)
+    #Join from df_cat "Property Name" and "Category"
+    df_sales = pd.concat([temp_df, df_cat], join='outer', axis=1)
