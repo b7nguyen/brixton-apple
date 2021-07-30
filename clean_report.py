@@ -127,7 +127,7 @@ def clean_sales_report(data):
 #    data['Lease ID'] = data['Lease Name']
 #    data['Lease ID'] = data['Lease ID'].map(lambda x: 
 #                                            x[x.find('(')+1:x.find(')')-1])
-    data.set_index('Lease Name', inplace=True)
+    #data.set_index('Lease Name', inplace=True)
   
     return data
 
@@ -156,10 +156,45 @@ def clean_category_report(data):
 #    data['Lease ID'] = data['Lease ID'].map(lambda x: 
 #                                            x[x.find('(')+1:x.find(')')-1])
 
-    data.set_index('Tenant Name', inplace=True)
+    #data.set_index('Tenant Name', inplace=True)
     
     return data
 
+def clean_ten(data):
+    #drop row index 0,3 amd column 17
+    data.drop([0,3], axis=0, inplace=True)
+    data.drop(['Unnamed: 17', 'Unnamed: 18'], axis=1, inplace=True)
+    data.reset_index(drop=True, inplace=True)
+ 
+    #Change all na to '' on row 1 and strip the white space in front and back
+    data.iloc[1,:] = data.iloc[1,:].map(lambda x: '' if type(x) == float else x)
+    data.iloc[1,:] = data.iloc[1,:].map(lambda x: x.strip())
+    
+    #Strip white space
+    data.iloc[0,:] = data.iloc[0,:].map(lambda x: x.strip())
+    
+    #Create new column names by combining row 0 and 1 and drop them
+    data.columns = (df_ten_schedule.iloc[1,:] + ' ' + df_ten_schedule.iloc[0,:]).values
+    data.drop([0,1], inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    
+    #Strip white space again 
+    data.columns = data.columns.map(lambda x: x.strip())
+    
+    #Remove any NA or VACANT leease names becuas we will use this as index to join
+    data = data.loc[data['Lease'].isna()==False,:]
+    data = data.loc[data['Lease']!='VACANT',:]
+#    for i in data.columns:
+#        data = data.rename(columns={i:i.lstrip().rstrip()}) 
+    
+    #rename the columns with the first row and drop the row
+#    data.columns = data.iloc[0]
+#    data.drop([0], inplace=True)
+#    data.reset_index(drop=True, inplace=True)
+    
+    #data.set_index('Lease', inplace=True)
+    
+    return data
 
 def joinCol(data1, data2):
     if(data1.empty):
@@ -183,18 +218,27 @@ if __name__ == '__main__':
         for i in df_sales:
             if temp_df.empty:
                 temp_df = clean_sales_report(i)
+
             else:
-                temp_df = pd.concat([temp_df, clean_sales_report(i)], join='outer', axis=1)
+                temp_df = temp_df.merge(clean_sales_report(i), how='outer', on='Lease Name')
                 
     #Drop any duplicated comlumns. We may fix this later    
-    temp_df = temp_df.drop(labels=temp_df.columns[temp_df.columns.duplicated()], axis=1)
+    df_sales = temp_df.drop(labels=temp_df.columns[temp_df.columns.duplicated()], axis=1)
     
-                    
+     
+    #Read in files that contain ino and clean them           
     df_cat = readXLSFile(filename=FILE_ANALYSIS, sheet='Sales Category ')
-    
-    
-    #df_sales = clean_sales_report(df_sales)
     df_cat = clean_category_report(df_cat)
     
-    #Join from df_cat "Property Name" and "Category"
-    df_sales = pd.concat([temp_df, df_cat], join='outer', axis=1)
+    df_ten_schedule = readXLSFile(filename=FILE_ANALYSIS, sheet='Tenancy Schedule 2021')
+    df_ten_schedule = clean_ten(df_ten_schedule)
+    
+
+    #Merge in all the cleaned data into the sales master file
+    df_sales = df_sales.merge(df_cat, how='left', left_on='Lease Name', right_on='Tenant Name' )
+    df_sales.drop('Tenant Name', axis=1, inplace=True)
+    df_sales = df_sales.merge(df_ten_schedule, how='left', left_on='Lease Name', right_on='Lease' )
+    df_sales.drop('Lease', axis=1, inplace=True)
+    
+    
+    
