@@ -36,6 +36,9 @@ import math
 PATH = "./input/orginial_reports"
 FILETRAIN = "/RetailSales2018-2021.xlsx"
 FILE_ANALYSIS = "/BC Mngd Retail Sales Analysis Q1 2021-2020_2021.05.03.xlsx"
+MONTH_LIST = {'Jan':1, 'Feb':2, 'Mar':3, 'Apr':4, 'May':5, 'Jun':6, 
+              'Jul':7, 'Aug':8, 'Sep':9, 'Oct':10, 'Nov':11, 'Dec':12 }
+#%%
 
 
 def readCSVFile(filename):
@@ -206,6 +209,17 @@ def joinCol(data1, data2):
 
     return data
 
+#%%
+def format_sales_colname(data):
+    #For each column name, check to see if first 3 letters is in the Month List
+    #using mapping and change format to year/month format with string slicing.
+    data.columns = data.columns.map(lambda x: '{year}/{month}'.format(month=MONTH_LIST[x[0:3]], 
+                     year=x[4:]) if x[0:3] in MONTH_LIST else x)
+    
+    return data
+
+#%%
+
 if __name__ == '__main__':
     
     #Read every tab of from data file
@@ -239,6 +253,8 @@ if __name__ == '__main__':
     df_sales.drop('Tenant Name', axis=1, inplace=True)
     df_sales = df_sales.merge(df_ten_schedule, how='left', left_on='Lease Name', right_on='Lease' )
     df_sales.drop('Lease', axis=1, inplace=True)
+    
+    df_sales = format_sales_colname(df_sales)
     
     
     
