@@ -13,6 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn import metrics
 from pandas2arff import pandas2arff
+from datetime import datetime
 #from sklearn.tree.export import export_text
 
 #from decorators import ml_init
@@ -33,11 +34,14 @@ from imblearn.over_sampling import SMOTENC
 import numpy as np
 import math
 
+import plotly.offline as pyo
+import plotly.graph_objs as go
+
 PATH = "./input/orginial_reports"
 FILETRAIN = "/RetailSales2018-2021.xlsx"
 FILE_ANALYSIS = "/BC Mngd Retail Sales Analysis Q1 2021-2020_2021.05.03.xlsx"
-MONTH_LIST = {'Jan':1, 'Feb':2, 'Mar':3, 'Apr':4, 'May':5, 'Jun':6, 
-              'Jul':7, 'Aug':8, 'Sep':9, 'Oct':10, 'Nov':11, 'Dec':12 }
+MONTH_LIST = {'Jan':'01', 'Feb':'02', 'Mar':'03', 'Apr':'04', 'May':'05', 'Jun':'06', 
+              'Jul':'07', 'Aug':'08', 'Sep':'09', 'Oct':'10', 'Nov':'11', 'Dec':'12' }
 #%%
 
 
@@ -199,6 +203,34 @@ def clean_ten(data):
     
     return data
 
+
+def clean_report_cycle(data):
+    
+    #Remove junk rows
+    data = data.iloc[:,[3,4]]
+    data = data.drop([0,2], axis=0)
+    data.reset_index(drop=True, inplace=True)
+    
+    #Change all na to '' on row 0 and strip the white space in front and back
+    data.iloc[0,:] = data.iloc[0,:].map(lambda x: '' if type(x) == float else x)
+    data.iloc[0,:] = data.iloc[0,:].map(lambda x: x.strip())
+    
+    #rename the columns with the first row and drop the row
+    data.columns = data.iloc[0]
+    data.drop([0], inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    
+    
+    
+    #Remove rows that are NA from report cycle column
+    data = data.loc[data.iloc[:,0].isna()==False]
+    
+    #remove all whitespace at end and begining of column 'Reporting Cycle'
+    data['Reporting Cycle'] = data['Reporting Cycle'].map(lambda x: x.strip())
+    
+    return data
+
+
 def joinCol(data1, data2):
     if(data1.empty):
         print('first dframe returned')
@@ -219,13 +251,61 @@ def format_sales_colname(data):
     return data
 
 #%%
+    
+def make_sales_report(data):
+    
+    #Set the dates to numerical values, set the index as the lease name, and sort 
+    #the dates in order
+    data = data.iloc[:,df_sales.columns.str.contains('Lease Name|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec')]
+    data = format_sales_colname(data)
+    data.set_index('Lease Name', inplace=True)
+    data = data[sorted(data.columns)]
+    
+    traces = []
+
+
+    #For each row or index name, extract only columns with sales > 100
+    #Then create a line or Scatter object for that 
+    for name in data.index:
+        temp = data.loc[[name]]  #Work with one row at a time, double bracket returns dframe
+        col = temp.values > 100  #col is an array of booleans
+        temp = temp.iloc[:,col[0]] #Since there is only one item in dataframe, we can access it at [0]
+        
+        #Make a list of the traces
+        traces.append(go.Scatter(
+                x=temp.columns,
+                y=temp.loc[name],
+                mode='markers+lines',
+                name=name))
+    
+    
+#    traces = [go.Scatter(
+#        x = data.columns,
+#        y = data.loc[name],
+#        mode = 'markers+lines',
+#        name = name
+#    ) for name in data.index]
+    
+#
+    layout = go.Layout(
+        title='Year to Year Comparison',
+        hovermode='closest'
+    )
+    
+    fig = go.Figure(data=traces,layout=layout)
+    pyo.plot(fig, filename='Brixton.html')
+
+    
+#%%
 
 if __name__ == '__main__':
     
     #Read every tab of from data file
     df_sales = readXLSFileSheets(filename=FILETRAIN, all_sheets=True)
     temp_df = pd.DataFrame()
+
     
+
     #If there is more than one tab, then the file is a list of dframes, else
     #clean the one tab
     if type(df_sales) == list:
@@ -239,13 +319,16 @@ if __name__ == '__main__':
     #Drop any duplicated comlumns. We may fix this later    
     df_sales = temp_df.drop(labels=temp_df.columns[temp_df.columns.duplicated()], axis=1)
     
-     
-    #Read in files that contain ino and clean them           
+ 
+    #Read in files that contain info and clean them           
     df_cat = readXLSFile(filename=FILE_ANALYSIS, sheet='Sales Category ')
     df_cat = clean_category_report(df_cat)
     
     df_ten_schedule = readXLSFile(filename=FILE_ANALYSIS, sheet='Tenancy Schedule 2021')
     df_ten_schedule = clean_ten(df_ten_schedule)
+    
+    df_report_cycle = readXLSFile(filename=FILE_ANALYSIS, sheet='Combined (Adjust here)')
+    df_report_cycle = clean_report_cycle(df_report_cycle)
     
 
     #Merge in all the cleaned data into the sales master file
@@ -253,8 +336,10 @@ if __name__ == '__main__':
     df_sales.drop('Tenant Name', axis=1, inplace=True)
     df_sales = df_sales.merge(df_ten_schedule, how='left', left_on='Lease Name', right_on='Lease' )
     df_sales.drop('Lease', axis=1, inplace=True)
+    df_sales = df_sales.merge(df_report_cycle, how='left', left_on='Lease Name', right_on='Lease Name' )
     
-    df_sales = format_sales_colname(df_sales)
+    make_sales_report(df_sales)
     
     
+    make_sales_report(df_sales)
     
