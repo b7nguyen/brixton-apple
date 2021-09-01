@@ -252,7 +252,7 @@ def format_sales_colname(data):
 
 #%%
     
-def make_sales_report(data):
+def make_report_lease_sales(data):
     
     #Set the dates to numerical values, set the index as the lease name, and sort 
     #the dates in order
@@ -262,7 +262,6 @@ def make_sales_report(data):
     data = data[sorted(data.columns)]
     
     traces = []
-
 
     #For each row or index name, extract only columns with sales > 100
     #Then create a line or Scatter object for that 
@@ -297,6 +296,63 @@ def make_sales_report(data):
 
     
 #%%
+    
+def set_sales(data):
+    data = data.iloc[:,df_sales.columns.str.contains('Lease Name|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec')]
+    data = format_sales_colname(data)
+    data.set_index('Lease Name', inplace=True)
+    data = data[sorted(data.columns)]
+    
+    return data
+
+def make_report_category_sales(data):
+    
+    #Set the dates to numerical values, set the index as the lease name. Need 
+    #Category column
+    data = data.iloc[:,df_sales.columns.str.contains('Lease Name|Category|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec')]
+    data = format_sales_colname(data)
+    data.set_index('Lease Name', inplace=True)
+    
+    #Sum up sales by each unique category
+    filtered_df = data.groupby(['Category']).sum()
+    
+    #Extrat the unique years
+    years_list = filtered_df.columns.map(lambda x: x[0:x.find('/')]).unique()
+    
+    #For each unique year and category, create a column of the total sales for that year
+    for year in years_list:
+        temp_year = [x for x in filtered_df.columns if year in x]
+        total = filtered_df[temp_year].sum(axis=1)
+        filtered_df['Total ' + str(year)] = total
+
+    
+    return(filtered_df, years_list, temp_year)
+    
+    #traces = []
+
+    #For each row or index name, extract only columns with sales > 100
+    #Then create a line or Scatter object for that 
+#    for name in data.index:
+#        temp = data.loc[[name]]  #Work with one row at a time, double bracket returns dframe
+#        col = temp.values > 100  #col is an array of booleans
+#        temp = temp.iloc[:,col[0]] #Since there is only one item in dataframe, we can access it at [0]
+#        
+#        #Make a list of the traces
+#        traces.append(go.Scatter(
+#                x=temp.columns,
+#                y=temp.loc[name],
+#                mode='markers+lines',
+#                name=name))
+    
+    
+#
+#    layout = go.Layout(
+#        title='Year to Year Comparison',
+#        hovermode='closest'
+#    )
+#    
+#    fig = go.Figure(data=traces,layout=layout)
+#    pyo.plot(fig, filename='Brixton.html')
 
 if __name__ == '__main__':
     
@@ -338,8 +394,6 @@ if __name__ == '__main__':
     df_sales.drop('Lease', axis=1, inplace=True)
     df_sales = df_sales.merge(df_report_cycle, how='left', left_on='Lease Name', right_on='Lease Name' )
     
-    make_sales_report(df_sales)
-    
-    
-    make_sales_report(df_sales)
+    #make_report_lease_sales(df_sales)
+    retval,years_list, temp_year = make_report_category_sales(df_sales)
     
