@@ -394,6 +394,8 @@ if __name__ == '__main__':
     df_sales.drop('Lease', axis=1, inplace=True)
     df_sales = df_sales.merge(df_report_cycle, how='left', left_on='Lease Name', right_on='Lease Name' )
     
+    df_sales.to_excel('cleaned_report.xlsx', index=False)
+
     #make_report_lease_sales(df_sales)
-    retval,years_list, temp_year = make_report_category_sales(df_sales)
+    #retval,years_list, temp_year = make_report_category_sales(df_sales)
     
